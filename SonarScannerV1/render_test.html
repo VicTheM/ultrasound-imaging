@@ -1,8 +1,3 @@
-#include <WiFi.h>
-#include <WebServer.h>
-#include "OLED-Display-SOLDERED.h"
-
-const char index_html[] PROGMEM = R"rawliteral(
 <html>
 <head>
     <script>
@@ -115,7 +110,7 @@ const char index_html[] PROGMEM = R"rawliteral(
             const canvas = document.getElementById("scan");
             const image = canvas.toDataURL("image/png").replace("image/png", "image/octet-stream");
             const link = document.createElement('a');
-            link.download = "sonar_img.png";
+            link.download = "radar_scan.png";
             link.href = image;
             link.click();
         }
@@ -140,78 +135,3 @@ const char index_html[] PROGMEM = R"rawliteral(
     </center>
 </body>
 </html>
-)rawliteral";
-
-OLED_Display display;
-
-const char* ssid = "Sonogrid";
-const char* password = "DavidNwafa";
-
-// Ultrasonic sensor pins
-const int trigPin = 14;
-const int echoPin = 27;
-
-WebServer server(80);
-
-void setup() {
-  // Serial.begin(115200);
-  if (!display.begin())
-  {
-    // Serial.println("Display init failed!");
-    ;
-  }
-  display.display();
-  delay(3000);
-
-  pinMode(trigPin, OUTPUT);
-  pinMode(echoPin, INPUT);
-
-  delay(10);
-
-  // We start by connecting to a WiFi network
-  if (!WiFi.softAP(ssid, password)){
-      ;
-    }
-  IPAddress IP = WiFi.softAPIP();
-  String apURL = "http://" + IP.toString() + "/";
-
-  // Serial.println();
-  // Serial.println();
-  // Serial.print("Device Url: ");
-  // Serial.println(apURL);
-
-  // Serve the HTML page
-  server.on("/", []() {
-    server.send(200, "text/html", index_html);
-  });
-
-  // Serve sensor data
-  server.on("/sensor_data", []() {
-    long duration, distance;
-    digitalWrite(trigPin, LOW);
-    delayMicroseconds(2);
-    digitalWrite(trigPin, HIGH);
-    delayMicroseconds(10);
-    digitalWrite(trigPin, LOW);
-    duration = pulseIn(echoPin, HIGH);
-    distance = (duration * 0.034 / 2); // Calculate distance in cm
-    server.send(200, "text/plain", String(distance));
-  });
-
-  server.begin();
-  display.clearDisplay();
-
-  display.setTextSize(1);              // Normal 1:1 pixel scale
-  display.setTextColor(SSD1306_WHITE); // Draw white text
-  display.setCursor(0, 0);             // Start at top-left corner
-  display.println(F(apURL.c_str()));
-  display.setCursor(0, 20);
-  display.print(F("SSID: Sonogrid"));
-  display.setCursor(0, 40);
-  display.println(F("Password: DavidNwafa"));
-  display.display();
-}
-
-void loop() {
-  server.handleClient();
-}
