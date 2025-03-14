@@ -1,0 +1,112 @@
+<html>
+	<head>
+		<script>
+			let depth = 256;
+			let distance = 1000;
+			let start = 80;
+			let maxx = 64;
+			let ctx;
+			let data;
+			let p;
+			let xs;
+			let ys;
+
+			function generateMockData() {
+				let arrayData = new Array(maxx);
+				for (let x = 0; x < maxx; x++) {
+					let a = new Array(depth);
+					for (let i = 0; i < depth; i++) {
+						// Add structured variation instead of pure noise
+						let noise = Math.random() * 50;
+						let fading = Math.exp(-i / depth * 3) * 80;
+						
+						a[i] = Math.floor(noise + fading);
+					}
+					arrayData[x] = a;
+				}
+				return arrayData;
+			}
+
+			function renderData(arrayData) {
+				const distanceR = distance / 2;
+				const startR = start / 2;
+				const totalR = startR + distanceR;
+				const mm2pix = ys / totalR;
+				const data2mm = distanceR / depth;
+				const data2pix = data2mm * mm2pix;
+				const startPix = startR * mm2pix;
+
+				let x0 = xs * 0.5;
+				let y0 = ys - 1;
+
+				// Clear the canvas before rendering new data
+				ctx.clearRect(0, 0, xs, ys);
+
+				for (let y = 0; y < ys; y++) {
+					for (let x = 0; x < xs; x++) {
+						let dx = x - x0;
+						let dy = y - y0;
+						let d = Math.sqrt(dx * dx + dy * dy);
+						let angleIndex = ((Math.atan2(dy, dx) + Math.PI * 0.5) / (Math.PI / 180 * 60) + 0.5) * maxx;
+						let angleLow = Math.floor(angleIndex);
+						let angleHigh = Math.min(angleLow + 1, maxx - 1);
+						let angleWeight = angleIndex - angleLow;
+
+						let depthIndex = (d - startPix) / data2pix;
+						let depthLow = Math.floor(depthIndex);
+						let depthHigh = Math.min(depthLow + 1, depth - 1);
+						let depthWeight = depthIndex - depthLow;
+
+						let v = 0;
+						let alpha = 0;
+
+						if (angleLow >= 0 && angleLow < maxx && depthLow >= 0 && depthLow < depth) {
+							let v00 = arrayData[angleLow][depthLow];
+							let v10 = arrayData[angleHigh][depthLow];
+							let v01 = arrayData[angleLow][depthHigh];
+							let v11 = arrayData[angleHigh][depthHigh];
+
+							// Bilinear interpolation
+							v = (v00 * (1 - angleWeight) + v10 * angleWeight) * (1 - depthWeight) +
+								(v01 * (1 - angleWeight) + v11 * angleWeight) * depthWeight;
+
+							// Depth-based fade-out
+							alpha = Math.max(0, 255 - (depthIndex / depth) * 255);
+						}
+
+						let pixelIndex = (xs * y + x) * 4;
+						p[pixelIndex + 0] = v;
+						p[pixelIndex + 1] = v;
+						p[pixelIndex + 2] = v;
+						p[pixelIndex + 3] = alpha;
+					}
+				}
+				ctx.putImageData(data, 0, 0);
+			}
+
+			function startRendering() {
+				let arrayData = generateMockData();
+				renderData(arrayData);
+				requestAnimationFrame(startRendering);
+			}
+
+			window.onload = function() {
+				const canvas = document.getElementById("scan");
+				ctx = canvas.getContext("2d");
+				xs = canvas.width;
+				ys = canvas.height;
+				data = ctx.getImageData(0, 0, xs, ys);
+				p = data.data;
+				ctx.clearRect(0, 0, canvas.width, canvas.height);
+				startRendering();
+			};
+		</script>
+	</head>
+	<body style="font-family: Arial, Helvetica, sans-serif; background-color: #001;">
+		<center>
+			<canvas id="scan" width="512" height="512" style="zoom: 1.5; border-style: solid; border-color: #111;"></canvas>
+			<br><br>
+			<button onclick="startRendering()">Restart Scan</button>
+		</center>
+	</body>
+</html>
